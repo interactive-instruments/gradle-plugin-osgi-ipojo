@@ -1,0 +1,68 @@
+
+plugins {
+    id "com.jfrog.bintray" version "1.6"
+}
+
+apply plugin: 'groovy'
+apply plugin: 'maven-publish'
+
+version = '1.12.1.26'
+group = 'de.interactive_instruments'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile localGroovy()
+    compile gradleApi()
+    compile group: 'org.apache.felix', name: 'org.apache.felix.ipojo.manipulator', version: '1.12.1'
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Gradle OSGI iPOJO Plugin',
+        'Implementation-Version': version,
+        'Built-By': System.getProperty('user.name'),
+        'Built-Date': new Date(),
+        'Built-JDK': System.getProperty('java.version'),
+        'Built-Gradle': gradle.gradleVersion
+    }
+}
+
+bintray {
+    user = project.bintrayUser
+    key = project.bintrayApiKey
+    publications = ['gradlePlugin']
+    publish = true
+    pkg {
+        repo = 'maven'
+        name = project.name
+        userOrg = 'iide'
+        licenses = ['Apache-2.0']
+        websiteUrl = 'https://github.com/interactive-instruments/gradle-plugin-osgi-ipojo'
+        issueTrackerUrl = 'https://github.com/interactive-instruments/gradle-plugin-osgi-ipojo/issues'
+        vcsUrl = 'https://github.com/interactive-instruments/gradle-plugin-osgi-ipojo.git'
+        githubRepo = 'interactive-instruments/gradle-plugin-osgi-ipojo' //Optional Github repository
+        githubReleaseNotesFile = 'README.md' //Optional Github readme file
+        version {
+            name = project.version
+        }
+    }
+}
+
+task sourceJar(type: Jar) {
+    from sourceSets.main.allSource
+}
+
+publishing {
+    publications {
+        gradlePlugin(MavenPublication) {
+            from components.java
+
+            artifact sourceJar {
+                classifier "sources"
+            }
+        }
+    }
+}
