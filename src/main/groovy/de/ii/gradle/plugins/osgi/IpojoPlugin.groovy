@@ -53,8 +53,8 @@ class IpojoPlugin implements Plugin<Project> {
                         // export only direct dependencies
                         // pkgs = getPackages(getDependencies(project, embedInstruction, false))
                         pkgs.each { pkg ->
-                            project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version}")
-                            project.jar.manifest.instruction("Import-Package", "${pkg.name}")
+                            project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
+                            project.jar.manifest.instruction("Import-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
                         }
 
                         project.jar.manifest.instruction("Export-Package", "*")
