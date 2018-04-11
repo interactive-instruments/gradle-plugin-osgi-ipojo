@@ -14,7 +14,7 @@ import java.net.URLClassLoader;
 
 class IpojoPlugin implements Plugin<Project> {
 
-    void apply(Project project) {
+	void apply(Project project) {
         project.plugins.apply(OsgiPlugin.class);
         
         project.tasks.jar.doFirst {
@@ -34,81 +34,85 @@ class IpojoPlugin implements Plugin<Project> {
                     }
                 }
 
-                    project.jar.manifest.instruction("Bundle-ClassPath",'.') //add the default classpath
-                    includedArtifacts.each { artifact -> 
-                        project.jar.from(artifact)
-                        project.jar.manifest.instruction("Bundle-ClassPath",artifact.name)
-                        // for bnd analysis
-                        if (doimport) {
-                            project.copy {
-                                from artifact
-                                into project.sourceSets.main.output.classesDir
-                            }
-                        }
-                    }
+				project.jar.manifest.instruction("Bundle-ClassPath",'.') //add the default classpath
+				includedArtifacts.each { artifact -> 
+					project.jar.from(artifact)
+					project.jar.manifest.instruction("Bundle-ClassPath",artifact.name)
+					// for bnd analysis
+					if (doimport) {
+						project.copy {
+							from artifact
+							into project.sourceSets.main.output.classesDir
+						}
+					}
+				}
 
-                    def pkgs = getPackages(deps)
+				def pkgs = getPackages(deps)
 
-                    if (export) {
-                        // export only direct dependencies
-                        // pkgs = getPackages(getDependencies(project, embedInstruction, false))
-                        pkgs.each { pkg ->
-                            project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
-                            project.jar.manifest.instruction("Import-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
-                        }
+				if (export) {
+					// export only direct dependencies
+					// pkgs = getPackages(getDependencies(project, embedInstruction, false))
+					pkgs.each { pkg ->
+						project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
+						project.jar.manifest.instruction("Import-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
+					}
 
-                        project.jar.manifest.instruction("Export-Package", "*")
-                    }
-                    else {
-                        pkgs.each { pkg ->
-                            project.jar.manifest.instructionFirst("Import-Package", "!${pkg.name}")
-                        }
-                    }
+					project.jar.manifest.instruction("Export-Package", "*")
+				}
+				else {
+					pkgs.each { pkg ->
+						project.jar.manifest.instructionFirst("Import-Package", "!${pkg.name}")
+					}
+				}
 
-                    project.jar.manifest.instruction("Import-Package", "*")
+				project.jar.manifest.instruction("Import-Package", "*")
 
-                    
-                }
-            }
+				
+			}
+		}
 
-            project.tasks.jar << { 
+		project.tasks.jar << { 
 
-                Pojoization pojo = new Pojoization(new EmptyReporter())
+			Pojoization pojo = new Pojoization(new EmptyReporter())
 
-                File jarfile = project.file(project.jar.archivePath)
-                File targetJarFile = project.file(project.jar.destinationDir.absolutePath +"/" + project.jar.baseName + "_out.jar")
+			File jarfile = project.file(project.jar.archivePath)
+			File targetJarFile = project.file(project.jar.destinationDir.absolutePath +"/" + project.jar.baseName + "_out.jar")
 
-                if (!jarfile.exists()) throw new InvalidUserDataException("The specified bundle file does not exist: " + jarfile.absolutePath)
+			if (!jarfile.exists()) throw new InvalidUserDataException("The specified bundle file does not exist: " + jarfile.absolutePath)
 
-                def classLoaderUrls = [new URL("file://${jarfile.absolutePath}")];
+			def classLoaderUrls = [jarfile.toURI().toURL()];
 
-                def dependencies = [] as Set
-                project.configurations.runtime.resolvedConfiguration.firstLevelModuleDependencies.each { dependency -> 
-                    dependencies.addAll(getDependenciesRecursive(dependency, true))
-                }
-                dependencies.each { dependency ->
-                    dependency.moduleArtifacts.each { art ->
-                        classLoaderUrls << new URL("file://${art.file.absolutePath}")
-                    }
-                }
+			def dependencies = [] as Set
+			project.configurations.runtime.resolvedConfiguration.firstLevelModuleDependencies.each { dependency -> 
+				dependencies.addAll(getDependenciesRecursive(dependency, true))
+			}
+			dependencies.each { dependency ->
+				dependency.moduleArtifacts.each { art ->
+					classLoaderUrls << art.file.toURI().toURL()
+				}
+			}
+			URLClassLoader urlClassLoader = new URLClassLoader(classLoaderUrls as URL[]);
 
-                URLClassLoader urlClassLoader = new URLClassLoader(classLoaderUrls as URL[]);
+			pojo.pojoization(jarfile, targetJarFile, (File) null, urlClassLoader)
 
-                pojo.pojoization(jarfile, targetJarFile, (File) null, urlClassLoader)
+			pojo.getWarnings().each { s ->  
+				println s
+			}   
+			
+			pojo = null;
+			urlClassLoader.close();
+			urlClassLoader = null;
+			System.gc();
 
-                pojo.getWarnings().each { s ->  
-                    println s
-                }   
-
-                if (jarfile.delete()) {
-                    if ( !targetJarFile.renameTo(jarfile) ) { 
-                        throw new InvalidUserDataException("Cannot rename the manipulated jar file");
-                    }   
-                    }else { 
-                        throw new InvalidUserDataException("Cannot delete the input jar file")
-                    }   
-                }
-            }
+			if (jarfile.delete()) {
+				if ( !targetJarFile.renameTo(jarfile) ) { 
+					throw new InvalidUserDataException("Cannot rename the manipulated jar file");
+				}   
+			} else { 
+					throw new InvalidUserDataException("Cannot delete the input jar file ${jarfile}")
+			}   
+		}
+	}
 
     /**
      * Gets the list of ResolvedDependencies for the list of embeded dependency names
@@ -128,54 +132,54 @@ class IpojoPlugin implements Plugin<Project> {
             def dependency = dependencyMap.get(embeded)
             if(dependency != null){
                 dependencies.addAll(getDependenciesRecursive(dependency, recursive))
-                } else {
-                    println "WARNING: dependency "+embeded+" not found"
-                }
-            }
-            return dependencies
-        }
+			} else {
+				println "WARNING: dependency "+embeded+" not found"
+			}
+		}
+		return dependencies
+	}
 
-        def getDependenciesRecursive(dependency, recursive) {
-            def dependencies = [] as Set
-            //println "dependency "+dependency.name
-            if(recursive){
-                dependency.children.each { child -> 
-                        //println "  child "+child.name+" Parents: "+child.parents
-                        dependencies.addAll(getDependenciesRecursive(child, recursive))
-                    }
-                }
-                dependencies.add(dependency)
+	def getDependenciesRecursive(dependency, recursive) {
+		def dependencies = [] as Set
+		//println "dependency "+dependency.name
+		if(recursive){
+			dependency.children.each { child -> 
+				//println "  child "+child.name+" Parents: "+child.parents
+				dependencies.addAll(getDependenciesRecursive(child, recursive))
+			}
+		}
+		dependencies.add(dependency)
 
-                return dependencies
-            }
+		return dependencies
+	}
 
-            def getPackages(dependencies) {
-                def packages = [] as Set
+	def getPackages(dependencies) {
+		def packages = [] as Set
 
-                dependencies.each { dep ->
-                    dep.moduleArtifacts.each { art ->
-                    //println " - artifact " + art.file.absolutePath
-                    
-                    // Your jar file
-                    JarFile jar = new JarFile(art.file);
-                    // Getting the files into the jar
-                    Enumeration<? extends JarEntry> enumeration = jar.entries();
+		dependencies.each { dep ->
+			dep.moduleArtifacts.each { art ->
+			//println " - artifact " + art.file.absolutePath
+			
+			// Your jar file
+			JarFile jar = new JarFile(art.file);
+			// Getting the files into the jar
+			Enumeration<? extends JarEntry> enumeration = jar.entries();
 
-                    // Iterates into the files in the jar file
-                    while (enumeration.hasMoreElements()) {
-                        ZipEntry zipEntry = enumeration.nextElement();
+			// Iterates into the files in the jar file
+			while (enumeration.hasMoreElements()) {
+				ZipEntry zipEntry = enumeration.nextElement();
 
-                        // Is this a class?
-                        if (zipEntry.getName().endsWith(".class")) {
-                            packages.add([name: zipEntry.getName().substring(0, zipEntry.getName().lastIndexOf('/')).replace('/','.'), version: dep.moduleVersion])
-                        }
-                    }
-                }
-            }
-            /*packages.each { pkg ->
-                println "package " + pkg
-                }*/
+				// Is this a class?
+				if (zipEntry.getName().endsWith(".class")) {
+					packages.add([name: zipEntry.getName().substring(0, zipEntry.getName().lastIndexOf('/')).replace('/','.'), version: dep.moduleVersion])
+				}
+			}
+		}
+	}
+	/*packages.each { pkg ->
+		println "package " + pkg
+		}*/
 
-                return packages
-            }
-        }
+		return packages
+	}
+}
