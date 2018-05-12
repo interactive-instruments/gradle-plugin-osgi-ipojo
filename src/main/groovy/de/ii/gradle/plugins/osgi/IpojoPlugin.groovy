@@ -170,7 +170,7 @@ class IpojoPlugin implements Plugin<Project> {
 				ZipEntry zipEntry = enumeration.nextElement();
 
 				// Is this a class?
-				if (zipEntry.getName().endsWith(".class")) {
+				if (zipEntry.getName().endsWith(".class") && zipEntry.getName().indexOf('/') > -1) {
 					packages.add([name: zipEntry.getName().substring(0, zipEntry.getName().lastIndexOf('/')).replace('/','.'), version: dep.moduleVersion])
 				}
 			}
