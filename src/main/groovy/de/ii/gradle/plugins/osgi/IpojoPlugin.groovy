@@ -26,6 +26,7 @@ class IpojoPlugin implements Plugin<Project> {
             if(embedInstruction != null){
                 def includedArtifacts = [] as Set
 
+                // determine artifacts that should be included in the bundle, might be transitive or not
                 def deps = getDependencies(project, embedInstruction, transitive)
 
                 deps.each { dependency ->
@@ -38,40 +39,54 @@ class IpojoPlugin implements Plugin<Project> {
 				includedArtifacts.each { artifact -> 
 					project.jar.from(artifact)
 					project.jar.manifest.instruction("Bundle-ClassPath",artifact.name)
-					// for bnd analysis
-					if (doimport) {
-						project.copy {
-							from artifact
-							into project.sourceSets.main.output.classesDir
-						}
-					}
 				}
 
+                // determine all dependent artifacts to analyze packages to be imported
+                if (doimport) {
+                	def requiredArtifacts = [] as Set
+	                def deps2 = getDependencies(project, embedInstruction, true)
+
+	                deps2.each { dependency ->
+	                    dependency.moduleArtifacts.each { artifact ->
+	                        requiredArtifacts.add(artifact.file)
+	                    }
+	                }
+
+	                requiredArtifacts.each { artifact -> 
+						// for bnd analysis
+						project.copy {
+							from artifact
+							into project.jar.manifest.classesDir
+						}
+					}
+	            }
+
+				// determine packages for export
 				def pkgs = getPackages(deps)
 
 				if (export) {
 					// export only direct dependencies
 					// pkgs = getPackages(getDependencies(project, embedInstruction, false))
 					pkgs.each { pkg ->
-						project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
-						project.jar.manifest.instruction("Import-Package", "${pkg.name};version=${pkg.version.replaceAll('-[\\w]+$', '')}")
+						project.jar.manifest.instruction("Export-Package", "${pkg.name};version=${pkg.version.replaceAll('(-[\\w]+)+$', '')}")
+						project.jar.manifest.instruction("Import-Package", "${pkg.name};version=${pkg.version.replaceAll('(-[\\w]+)+$', '')}")
 					}
-
-					project.jar.manifest.instruction("Export-Package", "*")
 				}
 				else {
 					pkgs.each { pkg ->
-						project.jar.manifest.instructionFirst("Import-Package", "!${pkg.name}")
+						project.jar.manifest.instructionFirst("Export-Package", "!${pkg.name}")
+						project.jar.manifest.instructionFirst("Private-Package", "${pkg.name}")
 					}
 				}
 
+				project.jar.manifest.instruction("Export-Package", "*")
 				project.jar.manifest.instruction("Import-Package", "*")
 
-				
+				//println project.jar.manifest.instructions
 			}
 		}
 
-		project.tasks.jar << { 
+		project.tasks.jar.doLast { 
 
 			Pojoization pojo = new Pojoization(new EmptyReporter())
 

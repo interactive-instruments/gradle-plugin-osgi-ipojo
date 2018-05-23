@@ -6,7 +6,7 @@ plugins {
 apply plugin: 'groovy'
 apply plugin: 'maven-publish'
 
-version = '1.12.1.29'
+version = '1.12.1.31'
 group = 'de.interactive_instruments'
 
 repositories {
