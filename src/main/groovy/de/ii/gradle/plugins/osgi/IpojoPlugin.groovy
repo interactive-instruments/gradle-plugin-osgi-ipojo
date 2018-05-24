@@ -76,6 +76,9 @@ class IpojoPlugin implements Plugin<Project> {
 					pkgs.each { pkg ->
 						project.jar.manifest.instructionFirst("Export-Package", "!${pkg.name}")
 						project.jar.manifest.instructionFirst("Private-Package", "${pkg.name}")
+						if (!doimport) {
+							project.jar.manifest.instructionFirst("Import-Package", "!${pkg.name}")
+						}
 					}
 				}
 
